@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Nebraska Football — History Hub (Persistent)</title>
+  <title>Nebraska Football — History Hub (Keep ALL Data)</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
   <style>
     :root{
@@ -18,7 +18,12 @@
     .logo{display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.4px}
     .logo-badge{ width:34px; height:34px; border-radius:8px; display:grid; place-items:center; background:radial-gradient(90px 50px at -10% 120%,#ff2d2d,#d00000 60%,#880000); box-shadow: 0 6px 20px rgba(208,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.09); font-weight:900; }
     .pill{ display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:12px; background:var(--chip); color:var(--muted); font-size:13px; border:1px solid var(--ring); }
-    .layout{max-width:1200px; margin:16px auto; display:grid; grid-template-columns: 340px 1fr; gap:16px; padding:0 16px 24px}
+    .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    select, input[type="number"], button{ font-family:inherit }
+    select, input[type="number"]{ background:var(--panel); border:1px solid var(--ring); color:var(--text); padding:8px 10px; border-radius:10px; }
+    .btn{ background:linear-gradient(180deg,#ff6868,#d00000); color:#fff; border:none; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:700; box-shadow:0 8px 26px rgba(208,0,0,.35); }
+    .btn.secondary{background:#1e2630; border:1px solid var(--ring); box-shadow:none; color:#d8e1ee}
+    .layout{max-width:1200px; margin:16px auto; display:grid; grid-template-columns: 360px 1fr; gap:16px; padding:0 16px 24px}
     aside{ background:var(--panel); border:1px solid var(--ring); border-radius:16px; overflow:hidden; }
     .aside-head{padding:12px 14px; display:flex; gap:8px; align-items:center; justify-content:space-between; border-bottom:1px solid var(--ring); background:var(--panel-2)}
     .aside-body{max-height:70vh; overflow:auto}
@@ -40,12 +45,11 @@
     tbody tr:hover{background:#121a21}
     .chip{display:inline-block; padding:3px 8px; border-radius:10px; background:#1e2630; border:1px solid var(--ring); color:#a9b3c2; font-size:12px}
     .home{color:#9dd5ff} .away{color:#ffc899} .bowl{color:#ffd36b}
-    .controls{display:flex; gap:12px; align-items:center}
-    .search{flex:1; position:relative;}
-    .search input{ width:100%; background:var(--panel); border:1px solid var(--ring); color:var(--text); padding:10px 12px 10px 36px; border-radius:12px; outline:none; caret-color:var(--accent); }
-    .search svg{position:absolute; left:10px; top:50%; transform:translateY(-50%); opacity:.6}
+    .progress{height:10px; background:#0e141a; border-radius:999px; overflow:hidden; border:1px solid var(--ring); width:220px}
+    .barfill{height:100%; background:linear-gradient(90deg,#ff7b7b,#d00000); width:0%}
     footer{max-width:1200px;margin:18px auto 40px; color:#a9b3c2; font-size:12px; text-align:center}
     .muted{color:#a9b3c2}
+    .hidden{display:none}
     @media (max-width:1000px){.layout{grid-template-columns:1fr}}
   </style>
 </head>
@@ -56,12 +60,18 @@
         <div class="logo-badge">N</div>
         <div>Nebraska Football — History Hub</div>
       </div>
+
       <div class="pill" id="apiStatus"><span id="apiStatusText">API: not connected</span></div>
+
       <div class="controls">
-        <div class="search">
-          <input id="search" type="search" placeholder="Search opponent, bowl, or venue…" />
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.2-4.2M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2"/></svg>
-        </div>
+        <div class="progress" title="Preload progress"><div class="barfill" id="barfill"></div></div>
+        <div class="pill">Loaded: <strong id="loadedCount">0</strong>/<span id="totalToLoad">0</span></div>
+
+        <button class="btn" id="preloadAllBtn" title="Fetch and cache all seasons">Preload ALL</button>
+        <button class="btn secondary" id="backupBtn" title="Download all cached seasons">Backup</button>
+        <label class="btn secondary" style="cursor:pointer">
+          Restore <input id="restoreInput" type="file" accept="application/json" class="hidden">
+        </label>
         <button class="btn secondary" id="clearCacheBtn" title="Clear cached seasons">Clear Cache</button>
         <button class="btn secondary" id="changeKeyBtn" title="Change API Key">API Key</button>
       </div>
@@ -78,7 +88,7 @@
         <ul class="season-list" id="seasonList"></ul>
       </div>
       <div class="muted" style="padding:12px;border-top:1px solid var(--ring)">
-        Your selection and search are remembered between refreshes.
+        ALL seasons can be cached locally. Use <strong>Backup</strong> to export, and <strong>Restore</strong> to import later or on a new device.
       </div>
     </aside>
 
@@ -118,34 +128,24 @@
   </div>
 
   <footer>
-    Persistent selection & search via localStorage + season data cached in IndexedDB.
+    Preload ALL seasons to IndexedDB. Backup/Restore your cache. Offline-ready via Service Worker.
   </footer>
 
   <script>
-    // -------- Helpers --------
+    // ------------------ Utilities ------------------
     const $ = s => document.querySelector(s);
     const el = (t,c,txt)=>{const e=document.createElement(t); if(c) e.className=c; if(txt) e.textContent=txt; return e;};
+    const wait = ms => new Promise(r=>setTimeout(r,ms));
+    function jitter(ms){ return ms + Math.floor(Math.random()*ms*0.25); }
 
-    // Normalize payload: either array or {games,cachedAt}
-    function normalizePayload(p){
-      if(Array.isArray(p)) return { games: p, cachedAt: new Date(0).toISOString() };
-      if(p && Array.isArray(p.games)) return { games: p.games, cachedAt: p.cachedAt || new Date().toISOString() };
-      return { games: [], cachedAt: new Date(0).toISOString() };
-    }
+    // ------------------ Persistence keys ------------------
+    const LS = { key:"cfbd_key", selected:"ui_selected_season" };
 
-    // -------- Storage keys --------
-    const LS = {
-      key: "cfbd_key",
-      selected: "ui_selected_season",
-      scrollTop: "ui_seasons_scroll",
-      search: "ui_search_text"
-    };
-
-    // -------- IndexedDB --------
+    // ------------------ IndexedDB ------------------
     const DB_NAME = "cfbdCache"; const STORE = "seasons";
     function idbOpen(){
       return new Promise((resolve,reject)=>{
-        const req = indexedDB.open(DB_NAME,2);
+        const req = indexedDB.open(DB_NAME,3);
         req.onupgradeneeded = (e)=>{ const db=e.target.result; if(!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE); };
         req.onerror = ()=> reject(req.error);
         req.onsuccess = ()=> resolve(req.result);
@@ -167,16 +167,46 @@
         req.onerror = ()=> reject(req.error);
       });
     }
+    async function idbKeys(){
+      const db = await idbOpen(); return new Promise((resolve,reject)=>{
+        const tx = db.transaction(STORE,"readonly"); const st = tx.objectStore(STORE);
+        const keys = [];
+        const req = st.openCursor();
+        req.onsuccess = (e)=>{
+          const cur = e.target.result;
+          if(cur){ keys.push(cur.key); cur.continue(); } else resolve(keys);
+        };
+        req.onerror = ()=> reject(req.error);
+      });
+    }
+    async function idbClear(){
+      const db = await idbOpen(); return new Promise((resolve,reject)=>{
+        const tx = db.transaction(STORE,"readwrite"); const st = tx.objectStore(STORE);
+        const req = st.clear();
+        req.onsuccess = ()=> resolve(true);
+        req.onerror = ()=> reject(req.error);
+      });
+    }
 
-    // -------- API --------
+    // ------------------ API ------------------
     const CFBD = {
       base: "https://api.collegefootballdata.com",
-      async get(path, params={}){
+      async get(path, params={}, attempt=0){
         const key = localStorage.getItem(LS.key);
         if(!key) throw new Error("Missing CFBD API key");
         const url = new URL(this.base + path);
         Object.entries(params).forEach(([k,v])=> v!=null && url.searchParams.set(k,v));
         const res = await fetch(url, { headers: { "Authorization": "Bearer " + key }});
+        if(res.status === 429 || res.status >= 500){
+          if(attempt < 5){
+            const backoff = jitter(400 * Math.pow(2, attempt));
+            $("#apiStatusText").textContent = `Retrying ${attempt+1}/5 in ${Math.ceil(backoff/1000)}s…`;
+            await wait(backoff);
+            return this.get(path, params, attempt+1);
+          }
+          const txt = await res.text();
+          throw new Error(`CFBD ${res.status}: ${txt}`);
+        }
         if(!res.ok){
           const txt = await res.text();
           throw new Error(`CFBD ${res.status}: ${txt}`);
@@ -185,59 +215,29 @@
       }
     };
 
-    // -------- State --------
+    // ------------------ State ------------------
     const state = {
       startYear: 1890,
       endYear: new Date().getFullYear(),
       mem: new Map(),
       selected: null
     };
-
     function setApiStatus(msg){ $("#apiStatusText").textContent = msg; }
     function setLeft(msg){ $("#leftMsg").textContent = msg; }
 
-    $("#changeKeyBtn").addEventListener("click", ()=>{
-      const v = prompt("Paste your CollegeFootballData API key (stored locally):", localStorage.getItem(LS.key) || "");
-      if(v){ localStorage.setItem(LS.key, v.trim()); setApiStatus("Key saved."); }
-    });
-    $("#clearCacheBtn").addEventListener("click", async ()=>{
-      const db = await idbOpen();
-      await new Promise((resolve,reject)=>{ const tx = db.transaction(STORE,"readwrite"); const st = tx.objectStore(STORE); const req = st.clear(); req.onsuccess=()=>resolve(true); req.onerror=()=>reject(req.error); });
-      state.mem.clear(); setApiStatus("Cache cleared");
-    });
-
-    // Search persistence
-    const searchInput = $("#search");
-    searchInput.value = localStorage.getItem(LS.search) || "";
-    searchInput.addEventListener("input", ()=>{
-      localStorage.setItem(LS.search, searchInput.value);
-      renderGamesFilter();
-    });
-
-    // Build list and restore scroll/selection
-    function buildSeasonList(){
-      const ul = $("#seasonList"); ul.innerHTML="";
-      for(let y=state.endYear; y>=state.startYear; y--){
-        const li = el("li"); const left = el("div","", y.toString()); const right = el("small","muted","");
-        li.append(left,right);
-        li.addEventListener("click", ()=> selectSeason(y, li, right, {save:true}));
-        ul.appendChild(li);
+    // ------------------ Preload All ------------------
+    class Queue{
+      constructor(max=4){ this.max=max; this.running=0; this.q=[]; }
+      push(fn){ return new Promise((resolve,reject)=>{ this.q.push({fn,resolve,reject}); this.run(); }); }
+      run(){
+        while(this.running < this.max && this.q.length){
+          const {fn,resolve,reject} = this.q.shift();
+          this.running++;
+          fn().then(resolve).catch(reject).finally(()=>{ this.running--; this.run(); });
+        }
       }
-      // restore scroll
-      const savedScroll = parseInt(localStorage.getItem(LS.scrollTop)||"0",10);
-      $("#seasonScroll").scrollTop = isNaN(savedScroll)?0:savedScroll;
-
-      // restore selection
-      const saved = parseInt(localStorage.getItem(LS.selected)||"",10);
-      const target = [...ul.children].find(li => parseInt(li.firstChild.textContent,10)===saved);
-      if(target){ target.click(); }
-      else { const first = ul.querySelector("li"); if(first) first.click(); }
     }
-
-    // Observe and persist scroll
-    $("#seasonScroll").addEventListener("scroll", e=>{
-      localStorage.setItem(LS.scrollTop, String(e.target.scrollTop));
-    });
+    const queue = new Queue(4);
 
     async function fetchSeason(year){
       const [reg, post] = await Promise.all([
@@ -249,23 +249,109 @@
     }
 
     async function loadSeason(year){
-      if(state.mem.has(year)) return normalizePayload(state.mem.get(year));
+      if(state.mem.has(year)) return state.mem.get(year);
       const raw = await idbGet(`games-${year}`);
       if(raw){
-        const parsed = normalizePayload(JSON.parse(raw));
-        state.mem.set(year, parsed);
-        // background refresh
-        fetchSeason(year).then(fresh => {
-          state.mem.set(year, fresh);
-          idbSet(`games-${year}`, JSON.stringify(fresh));
-          if(state.selected === year){ renderSeason(year, fresh.games); }
-        }).catch(()=>{});
-        return parsed;
+        const payload = typeof raw === "string" ? JSON.parse(raw) : raw;
+        state.mem.set(year, payload);
+        return payload;
       }
       const fresh = await fetchSeason(year);
       state.mem.set(year, fresh);
       await idbSet(`games-${year}`, JSON.stringify(fresh));
-      return normalizePayload(fresh);
+      return fresh;
+    }
+
+    async function preloadAll(){
+      const years = []; for(let y=state.endYear; y>=state.startYear; y--) years.push(y);
+      $("#totalToLoad").textContent = years.length.toString();
+      let done=0; $("#loadedCount").textContent = "0"; $("#barfill").style.width = "0%";
+      setApiStatus("Preloading ALL…"); setLeft(`Queueing ${years.length} seasons…`);
+
+      await Promise.all(years.map(year => queue.push(async ()=>{
+        try{
+          await loadSeason(year);
+        }catch(e){
+          // ignore individual failures; backoff handled in CFBD.get
+        }finally{
+          done++; $("#loadedCount").textContent = String(done);
+          $("#barfill").style.width = Math.round(done/years.length*100) + "%";
+        }
+      })));
+
+      setApiStatus("All seasons cached"); setLeft("Ready");
+    }
+
+    // ------------------ Backup / Restore ------------------
+    async function backupAll(){
+      const keys = await idbKeys();
+      const out = { version: 1, createdAt: new Date().toISOString(), seasons: {} };
+      for(const k of keys){
+        if(String(k).startsWith("games-")){
+          const year = String(k).split("games-")[1];
+          const val = await idbGet(k);
+          try{
+            out.seasons[year] = typeof val === "string" ? JSON.parse(val) : val;
+          }catch{ /* skip bad entries */ }
+        }
+      }
+      const blob = new Blob([JSON.stringify(out)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "nebraska_cache_backup.json";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      setApiStatus("Backup downloaded");
+    }
+
+    async function restoreAll(file){
+      const text = await file.text();
+      let parsed = null;
+      try{ parsed = JSON.parse(text); }catch(e){ alert("Invalid JSON"); return; }
+      if(!parsed || !parsed.seasons){ alert("Invalid backup format"); return; }
+      setApiStatus("Restoring backup…");
+      for(const [year, payload] of Object.entries(parsed.seasons)){
+        await idbSet(`games-${year}`, JSON.stringify(payload));
+        state.mem.set(parseInt(year,10), payload);
+      }
+      setApiStatus("Restore complete");
+      // Refresh current selection if present
+      if(state.selected){
+        const p = state.mem.get(state.selected) || await loadSeason(state.selected);
+        renderSeason(state.selected, p.games || []);
+      }
+    }
+
+    // ------------------ UI events ------------------
+    $("#preloadAllBtn").addEventListener("click", preloadAll);
+    $("#backupBtn").addEventListener("click", backupAll);
+    $("#restoreInput").addEventListener("change", (e)=>{
+      const file = e.target.files?.[0]; if(file) restoreAll(file);
+      e.target.value = "";
+    });
+    $("#changeKeyBtn").addEventListener("click", ()=>{
+      const v = prompt("Paste your CollegeFootballData API key (stored locally):", localStorage.getItem(LS.key) || "");
+      if(v){ localStorage.setItem(LS.key, v.trim()); setApiStatus("Key saved."); }
+    });
+    $("#clearCacheBtn").addEventListener("click", async ()=>{
+      await idbClear(); state.mem.clear(); setApiStatus("Cache cleared");
+    });
+
+    // ------------------ Seasons UI ------------------
+    function buildSeasonList(){
+      const ul = $("#seasonList"); ul.innerHTML="";
+      for(let y=state.endYear; y>=state.startYear; y--){
+        const li = el("li"); const left = el("div","", y.toString()); const right = el("small","muted","");
+        li.append(left,right);
+        li.addEventListener("click", ()=> selectSeason(y, li, right, {save:true}));
+        ul.appendChild(li);
+      }
+      // restore selection
+      const saved = parseInt(localStorage.getItem(LS.selected)||"",10);
+      const target = [...ul.children].find(li => parseInt(li.firstChild.textContent,10)===saved);
+      if(target){ target.click(); }
+      else { const first = ul.querySelector("li"); if(first) first.click(); }
     }
 
     async function selectSeason(year, li, rightEl, {save}={save:false}){
@@ -274,9 +360,9 @@
       setLeft("Loading…"); setApiStatus("Loading…");
       try{
         const payload = await loadSeason(year);
-        renderSeason(year, payload.games);
+        renderSeason(year, payload.games || []);
         rightEl.textContent = `${$("#w").textContent}-${$("#l").textContent}${($("#t").textContent!=="0")?'-'+$("#t").textContent:''}`;
-        setLeft("Ready"); setApiStatus(`Cached: ${new Date(payload.cachedAt).toLocaleString()}`);
+        setLeft("Ready"); setApiStatus(`Cached: ${(payload.cachedAt?new Date(payload.cachedAt):new Date()).toLocaleString()}`);
         state.selected = year;
         if(save){ localStorage.setItem(LS.selected, String(year)); }
       }catch(err){
@@ -302,12 +388,6 @@
         const result = scoreKnown ? ((isHome?g.homePoints:g.awayPoints) > (isHome?g.awayPoints:g.homePoints) ? "W":"L") : "—";
         if(result==="W") w++; else if(result==="L") l++; else t++;
         const conf = isHome ? g.homeConference : g.awayConference; if(conf) confSet.add(conf);
-
-        // search filter
-        const q = (searchInput.value || "").toLowerCase();
-        const hay = [opp, oppConf, ha, type, g.venue||"", (date?date.toLocaleDateString():"")].join(" ").toLowerCase();
-        if(q && !hay.includes(q)) continue;
-
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${week}</td>
@@ -326,7 +406,12 @@
       $("#seasonMeta").textContent = `${games.length} game${games.length===1?"":"s"}`;
     }
 
+    // ------------------ Boot ------------------
     (function init(){
+      // Service Worker (offline app shell)
+      if("serviceWorker" in navigator){
+        navigator.serviceWorker.register("./sw.js").catch(()=>{});
+      }
       if(localStorage.getItem(LS.key)) setApiStatus("Key found");
       else {
         const key = prompt("Enter your CollegeFootballData API key:");
