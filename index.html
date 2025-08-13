@@ -1,10 +1,479 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Nebraska Football — Complete Season History</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nebraska Football — Complete Season History</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+  <style>
+    :root{
+      --bg:#0b0d10; --panel:#12161b; --panel-2:#171c22; --text:#e9eef5; --muted:#a9b3c2;
+      --accent:#d00000; --accent-2:#ff4d4d; --ok:#29c667; --bad:#f25555; --chip:#222831; --ring:#263241;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:linear-gradient(180deg,#0b0d10 0%, #0e1318 100%);
+      color:var(--text); font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    }
+    header{
+      position:sticky; top:0; z-index:50; backdrop-filter: blur(6px);
+      background:rgba(11,13,16,.75); border-bottom:1px solid #12171f;
+    }
+    .bar{
+      max-width:1200px; margin:0 auto; padding:14px 16px; display:flex; gap:12px; align-items:center;
+    }
+    .logo{display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.4px}
+    .logo-badge{
+      width:34px; height:34px; border-radius:8px; display:grid; place-items:center;
+      background:radial-gradient(90px 50px at -10% 120%,#ff2d2d,#d00000 60%,#880000);
+      box-shadow: 0 6px 20px rgba(208,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.09);
+      font-weight:900;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:12px; background:var(--chip); color:var(--muted); font-size:13px;
+      border:1px solid var(--ring);
+    }
+    .search{flex:1; position:relative;}
+    .search input{
+      width:100%; background:var(--panel); border:1px solid var(--ring); color:var(--text);
+      padding:10px 12px 10px 36px; border-radius:12px; outline:none; caret-color:var(--accent);
+    }
+    .search svg{position:absolute; left:10px; top:50%; transform:translateY(-50%); opacity:.6}
+    .kpis{display:flex; gap:8px; flex-wrap:wrap}
+    .kpis .pill strong{color:#fff; font-weight:700}
+
+    .layout{max-width:1200px; margin:16px auto; display:grid; grid-template-columns: 320px 1fr; gap:16px; padding:0 16px 24px}
+    aside{
+      background:var(--panel); border:1px solid var(--ring); border-radius:16px; overflow:hidden;
+    }
+    .aside-head{padding:12px 14px; display:flex; gap:8px; align-items:center; justify-content:space-between; border-bottom:1px solid var(--ring); background:var(--panel-2)}
+    .aside-body{max-height:70vh; overflow:auto}
+    .season-list{list-style:none;margin:0;padding:0}
+    .season-list li{
+      display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.04);
+      cursor:pointer; transition:background .15s ease;
+    }
+    .season-list li:hover{background:#151b22}
+    .season-list li.active{background:linear-gradient(90deg, rgba(208,0,0,.18), transparent 60%); border-left:3px solid var(--accent)}
+    .season-list small{color:var(--muted)}
+    .decades{display:flex; flex-wrap:wrap; gap:8px; padding:12px; border-bottom:1px solid var(--ring)}
+    .decades button{
+      background:var(--chip); color:var(--muted); border:1px solid var(--ring); border-radius:999px; padding:6px 10px; cursor:pointer; font-weight:600;
+    }
+    .decades button.active{background:var(--accent); color:#fff; border-color:transparent}
+
+    main{
+      background:var(--panel); border:1px solid var(--ring); border-radius:16px; overflow:hidden;
+    }
+    .main-head{display:flex; align-items:center; justify-content:space-between; padding:14px; background:var(--panel-2); border-bottom:1px solid var(--ring)}
+    .main-title{display:flex; align-items:center; gap:10px}
+    .tag{font-size:12px; padding:6px 10px; border-radius:999px; background:#19222c; color:#b9c2d0; border:1px solid var(--ring)}
+    .record{display:flex; gap:10px; align-items:center}
+    .record .w{color:var(--ok)} .record .l{color:var(--bad)} .record .t{color:#e8c454}
+    .table-wrap{max-height:66vh; overflow:auto}
+    table{width:100%; border-collapse:collapse; font-size:14px}
+    thead th{position:sticky; top:0; z-index:2; background:#0f151b; border-bottom:1px solid var(--ring); text-align:left; padding:10px 12px}
+    tbody td{border-bottom:1px solid rgba(255,255,255,.05); padding:10px 12px}
+    tbody tr:hover{background:#121a21}
+    .chip{display:inline-block; padding:3px 8px; border-radius:10px; background:#1e2630; border:1px solid var(--ring); color:var(--muted); font-size:12px}
+    .home{color:#9dd5ff} .away{color:#ffc899} .bowl{color:#ffd36b}
+    .btn{
+      background:linear-gradient(180deg,#ff6868,#d00000); color:#fff; border:none; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:700;
+      box-shadow:0 8px 26px rgba(208,0,0,.35);
+    }
+    .btn.secondary{background:#1e2630; border:1px solid var(--ring); box-shadow:none; color:#d8e1ee}
+    footer{max-width:1200px;margin:18px auto 40px; color:var(--muted); font-size:12px; text-align:center}
+    .grid{display:grid; gap:12px; grid-template-columns:repeat(2,1fr); padding:12px}
+    @media (max-width:1000px){.layout{grid-template-columns:1fr}}
+    @media (max-width:720px){.grid{grid-template-columns:1fr}}
+    .note{padding:12px; color:#c7d2e4; background:#10161c; border-top:1px solid var(--ring)}
+    .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#17202a; border:1px solid var(--ring); color:#a6b1c2; font-size:12px}
+    .spinner{width:18px;height:18px;border:2px solid #2a3441;border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    canvas{background:#0f151b; border-top:1px solid var(--ring)}
+    .muted{color:var(--muted)}
+  </style>
 </head>
 <body>
-<p>Full HTML content from earlier goes here...</p>
+  <header>
+    <div class="bar">
+      <div class="logo">
+        <div class="logo-badge">N</div>
+        <div>Nebraska Football — History Hub</div>
+      </div>
+      <div class="pill" id="apiStatus"><span class="spinner" style="display:none"></span><span id="apiStatusText">API: not connected</span></div>
+      <div class="search">
+        <input id="search" type="search" placeholder="Search opponent, bowl, or venue…" />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.2-4.2M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2"/></svg>
+      </div>
+      <div class="kpis">
+        <div class="pill">Total Seasons: <strong id="kSeasons">—</strong></div>
+        <div class="pill">Games Loaded: <strong id="kGames">—</strong></div>
+        <div class="pill">Overall: <strong id="kOverall">—</strong></div>
+      </div>
+      <button class="btn secondary" id="changeKeyBtn" title="Change API Key">API Key</button>
+      <button class="btn" id="refreshBtn" title="Reload Data">Reload</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <div class="aside-head">
+        <div><strong>Seasons</strong> <span class="muted">1890–present</span></div>
+        <div class="badge" id="loadState"><span class="spinner" id="leftSpin" style="display:none"></span><span id="leftMsg">Idle</span></div>
+      </div>
+      <div class="decades" id="decadeFilters"></div>
+      <div class="aside-body">
+        <ul class="season-list" id="seasonList"></ul>
+      </div>
+      <div class="note">
+        Uses the CollegeFootballData API for authoritative game results. Postseason (bowls) are included. <span class="muted">Tip: press <kbd>/</kbd> to focus search.</span>
+      </div>
+    </aside>
+
+    <main>
+      <div class="main-head">
+        <div class="main-title">
+          <h2 id="seasonTitle" style="margin:0;font-size:18px">Select a season</h2>
+          <span class="tag" id="seasonMeta">—</span>
+        </div>
+        <div class="record">
+          <div class="tag">W-L-T: <span class="w" id="w">0</span> - <span class="l" id="l">0</span> - <span class="t" id="t">0</span></div>
+          <div class="tag">Conference: <span id="conf">—</span></div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="gamesTable">
+          <thead>
+            <tr>
+              <th>Week</th>
+              <th>Date</th>
+              <th>Opponent</th>
+              <th>Home/Away</th>
+              <th>Conference</th>
+              <th>Score</th>
+              <th>Result</th>
+              <th>Venue</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody id="gamesBody">
+            <tr><td colspan="9" class="muted" style="padding:18px">No season selected.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid">
+        <div>
+          <canvas id="trendChart" height="180"></canvas>
+          <div class="note">Win totals by decade for quick at-a-glance history.</div>
+        </div>
+        <div>
+          <canvas id="oppChart" height="180"></canvas>
+          <div class="note">Most common opponents in selected decade (top 10).</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer>
+    Data © CollegeFootballData.com • Background facts via public season lists. This site is fan-made for educational use.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    // ---------- Minimal helper ----------
+    const $ = sel => document.querySelector(sel);
+    const el = (tag, cls, text) => { const e=document.createElement(tag); if(cls) e.className=cls; if(text) e.textContent=text; return e; };
+    const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+    // ---------- API / Storage ----------
+    const CFBD = {
+      base: "https://api.collegefootballdata.com",
+      async get(path, params={}){
+        const key = localStorage.getItem("cfbd_key");
+        if(!key) throw new Error("Missing CFBD API key");
+        const url = new URL(this.base + path);
+        Object.entries(params).forEach(([k,v])=> v!=null && url.searchParams.set(k,v));
+        const res = await fetch(url.toString(), { headers: { "Authorization": "Bearer " + key }});
+        if(!res.ok){ throw new Error("CFBD error " + res.status + " — " + (await res.text())) }
+        return res.json();
+      }
+    };
+
+    // ---------- State ----------
+    const state = {
+      startYear: 1890,
+      endYear: new Date().getFullYear(),
+      seasons: new Map(), // season -> array of games
+      summaries: new Map(), // season -> {w,l,t,conf,postWins,postLosses}
+      allGames: [], // flattened for search
+      decade: "All",
+      filteredSeasons: [],
+      selectedSeason: null
+    };
+
+    // ---------- UI Boot ----------
+    document.addEventListener("keydown", (e)=>{ if(e.key === "/"){ e.preventDefault(); $("#search").focus(); }});
+    $("#changeKeyBtn").addEventListener("click", async ()=>{
+      const key = prompt("Paste your CollegeFootballData API key (stored locally in your browser):", localStorage.getItem("cfbd_key") || "");
+      if(key){
+        localStorage.setItem("cfbd_key", key.trim());
+        setApiStatus("Key saved, ready.");
+      }
+    });
+    $("#refreshBtn").addEventListener("click", ()=> bootstrap(true));
+    $("#search").addEventListener("input", e => renderGames(state.selectedSeason, e.target.value.trim().toLowerCase()));
+
+    function setApiStatus(msg, loading=false){
+      $("#apiStatusText").textContent = msg;
+      $("#apiStatus .spinner").style.display = loading ? "inline-block" : "none";
+    }
+    function setLeft(msg, loading=false){
+      $("#leftMsg").textContent = msg;
+      $("#leftSpin").style.display = loading ? "inline-block" : "none";
+    }
+
+    // ---------- Load everything ----------
+    async function bootstrap(force=false){
+      try{
+        setApiStatus("Checking key…", true);
+        let key = localStorage.getItem("cfbd_key");
+        if(!key){
+          key = prompt("Enter your free CollegeFootballData API key:");
+          if(!key){ alert("An API key is required to load data."); setApiStatus("API: missing key"); return; }
+          localStorage.setItem("cfbd_key", key.trim());
+        }
+        setApiStatus("Key OK. Loading seasons…", true);
+
+        if(force){ state.seasons.clear(); state.summaries.clear(); state.allGames = []; }
+
+        await loadAllSeasons();
+        buildDecadeFilters();
+        renderSeasonList();
+        renderKPIs();
+        drawTrendChart();
+      }catch(err){
+        console.error(err);
+        setApiStatus("Error: " + err.message);
+      }finally{
+        setApiStatus("Ready");
+      }
+    }
+
+    async function loadAllSeasons(){
+      setLeft("Loading…", true);
+      const years = [];
+      for(let y=state.endYear; y>=state.startYear; y--) years.push(y);
+
+      // stagger requests a bit to be polite
+      let loaded=0;
+      for(const year of years){
+        if(!state.seasons.has(year)){
+          try{
+            const [reg, post] = await Promise.all([
+              CFBD.get("/games", { year, seasonType: "regular", team: "Nebraska" }),
+              CFBD.get("/games", { year, seasonType: "postseason", team: "Nebraska" })
+            ]);
+            const games = [...reg, ...post].sort((a,b)=> new Date(a.start_date) - new Date(b.start_date));
+            state.seasons.set(year, games);
+            summarizeSeason(year, games);
+            state.allGames.push(...games.map(g => ({...g, season: year})));
+          }catch(e){
+            // If CFBD lacks ultra-old seasons gracefully continue
+            state.seasons.set(year, []);
+            state.summaries.set(year, {w:0,l:0,t:0,conf:"—", postWins:0, postLosses:0});
+          }
+          await sleep(50);
+        }
+        loaded++;
+        if(loaded % 5 === 0) setLeft(`Loading ${loaded} seasons…`, true);
+      }
+      setLeft("Done", false);
+      state.filteredSeasons = Array.from(state.seasons.keys()).sort((a,b)=> b-a);
+    }
+
+    function summarizeSeason(year, games){
+      let w=0,l=0,t=0, confSet=new Set(), postWins=0, postLosses=0;
+      for(const g of games){
+        const isHome = g.home_team === "Nebraska";
+        const ptsFor = isHome ? g.home_points : g.away_points;
+        const ptsOpp  = isHome ? g.away_points : g.home_points;
+        if(ptsFor==null || ptsOpp==null) continue;
+        if(ptsFor > ptsOpp) { w++; if(g.season_type==="postseason") postWins++; }
+        else if(ptsFor < ptsOpp) { l++; if(g.season_type==="postseason") postLosses++; }
+        else t++;
+        const conf = isHome ? g.home_conference : g.away_conference;
+        if(conf) confSet.add(conf);
+      }
+      const conf = confSet.size ? Array.from(confSet).join(", ") : "—";
+      state.summaries.set(year, {w,l,t,conf,postWins,postLosses});
+    }
+
+    function renderKPIs(){
+      const seasons = Array.from(state.seasons.keys());
+      $("#kSeasons").textContent = seasons.length.toString();
+      $("#kGames").textContent = state.allGames.length.toString();
+      const totals = Array.from(state.summaries.values()).reduce((acc,s)=>({w:acc.w+s.w,l:acc.l+s.l,t:acc.t+s.t}),{w:0,l:0,t:0});
+      $("#kOverall").textContent = `${totals.w}-${totals.l}${totals.t?'-'+totals.t:''}`;
+    }
+
+    // ---------- Rendering ----------
+    function buildDecadeFilters(){
+      const box = $("#decadeFilters");
+      box.innerHTML = "";
+      const decades = ["All"];
+      for(let y=state.startYear; y<=state.endYear; y+=10) decades.push(`${y}s`);
+      decades.slice(-1)[0] !== `${Math.floor(state.endYear/10)*10}s` && decades.push(`${Math.floor(state.endYear/10)*10}s`);
+      for(const d of decades){
+        const b = el("button", d==="All" ? "active": "", d);
+        b.addEventListener("click", ()=>{
+          [...box.children].forEach(c=>c.classList.remove("active")); b.classList.add("active");
+          state.decade = d; renderSeasonList();
+        });
+        box.appendChild(b);
+      }
+    }
+
+    function renderSeasonList(){
+      const ul = $("#seasonList");
+      ul.innerHTML = "";
+      const seasons = Array.from(state.seasons.keys()).sort((a,b)=> b-a);
+      const filtered = seasons.filter(y=>{
+        if(state.decade==="All") return true;
+        const start = parseInt(state.decade.slice(0,4),10);
+        return y>=start && y<start+10;
+      });
+      for(const y of filtered){
+        const li = el("li");
+        const left = el("div", "", y.toString());
+        const s = state.summaries.get(y) || {w:0,l:0,t:0};
+        const right = el("small","",`${s.w}-${s.l}${s.t?'-'+s.t:''}`);
+        li.append(left,right);
+        li.addEventListener("click", ()=>{
+          [...ul.children].forEach(n=>n.classList.remove("active"));
+          li.classList.add("active");
+          state.selectedSeason = y;
+          renderGames(y, $("#search").value.trim().toLowerCase());
+          updateMainHeader(y);
+          drawOppChart(y);
+        });
+        ul.appendChild(li);
+      }
+      renderKPIs();
+    }
+
+    function renderGames(year, q=""){
+      const body = $("#gamesBody");
+      const games = state.seasons.get(year) || [];
+      $("#seasonTitle").textContent = `Season ${year}`;
+      const sum = state.summaries.get(year) || {w:0,l:0,t:0,conf:"—"};
+      $("#w").textContent = sum.w; $("#l").textContent = sum.l; $("#t").textContent = sum.t; $("#conf").textContent = sum.conf;
+      $("#seasonMeta").textContent = `${games.length} game${games.length===1?"":"s"} • Bowls: ${sum.postWins+sum.postLosses>0? sum.postWins+"–"+sum.postLosses : "—"}`;
+
+      const rows = [];
+      const qmatch = (s)=> s?.toString().toLowerCase().includes(q);
+      for(const g of games){
+        const isHome = g.home_team === "Nebraska";
+        const opp = isHome ? g.away_team : g.home_team;
+        const oppConf = isHome ? g.away_conference : g.home_conference;
+        const ha = isHome ? "Home" : (g.neutral_site ? "Neutral" : "Away");
+        const type = g.season_type === "postseason" ? (g.notes || "Bowl") : "Regular";
+        const date = g.start_date ? new Date(g.start_date) : null;
+        const week = g.week ?? "";
+        const score = (g.home_points!=null && g.away_points!=null) ? `${isHome?g.home_points:g.away_points}–${isHome?g.away_points:g.home_points}` : "—";
+        const result = (g.home_points!=null && g.away_points!=null)
+              ? ((isHome?g.home_points:g.away_points) > (isHome?g.away_points:g.home_points) ? "W":"L")
+              : "—";
+
+        if(q && !(qmatch(opp)||qmatch(oppConf)||qmatch(ha)||qmatch(type)||qmatch(g.venue))) continue;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${week}</td>
+          <td>${date? date.toLocaleDateString():""}</td>
+          <td>${opp} ${oppConf?`<span class="chip">${oppConf}</span>`:""}</td>
+          <td class="${isHome?'home':'away'}">${ha}</td>
+          <td>${isHome ? (g.home_conference||"") : (g.away_conference||"")}</td>
+          <td><strong>${score}</strong></td>
+          <td class="${result==='W'?'w':'l'}">${result}</td>
+          <td>${g.venue||""}</td>
+          <td class="${g.season_type==='postseason'?'bowl':''}">${type}</td>
+        `;
+        rows.push(tr);
+      }
+      body.innerHTML = "";
+      if(rows.length===0){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="9" class="muted" style="padding:18px">No games match your search.</td>`;
+        body.appendChild(tr);
+      }else{
+        rows.forEach(r=> body.appendChild(r));
+      }
+    }
+
+    function updateMainHeader(year){
+      // placeholder for future enhancements
+    }
+
+    // ---------- Charts ----------
+    let trendChart, oppChart;
+    function drawTrendChart(){
+      const decadeWinMap = new Map();
+      for(const [year,games] of state.seasons){
+        const dec = Math.floor(year/10)*10;
+        let w=0;
+        for(const g of games){
+          const isHome = g.home_team==="Nebraska";
+          const pf = isHome? g.home_points : g.away_points;
+          const pa = isHome? g.away_points : g.home_points;
+          if(pf!=null && pa!=null && pf>pa) w++;
+        }
+        decadeWinMap.set(dec, (decadeWinMap.get(dec)||0)+w);
+      }
+      const labels = Array.from(decadeWinMap.keys()).sort((a,b)=>a-b).map(d=>`${d}s`);
+      const data = labels.map(lbl => {
+        const n = parseInt(lbl)*1; // convert "1990s" -> 1990 via parseInt
+        return decadeWinMap.get(n) || 0;
+      });
+      if(trendChart){ trendChart.destroy(); }
+      trendChart = new Chart($("#trendChart"), {
+        type: 'line',
+        data: { labels, datasets: [{ label:"Wins per decade", data, tension:.3 }]},
+        options: { plugins:{legend:{display:false}}, scales:{x:{grid:{color:"#1c2430"}}, y:{grid:{color:"#1c2430"}}} }
+      });
+    }
+
+    function drawOppChart(year){
+      const start = state.decade==="All" ? Math.floor(year/10)*10 : parseInt(state.decade);
+      const end = start + 10;
+      const counts = new Map();
+      for(const [y,games] of state.seasons){
+        if(y<start || y>=end) continue;
+        for(const g of games){
+          const isHome = g.home_team==="Nebraska";
+          const opp = isHome? g.away_team : g.home_team;
+          counts.set(opp, (counts.get(opp)||0)+1);
+        }
+      }
+      const entries = Array.from(counts.entries()).sort((a,b)=> b[1]-a[1]).slice(0,10);
+      const labels = entries.map(e=>e[0]);
+      const data = entries.map(e=>e[1]);
+      if(oppChart){ oppChart.destroy(); }
+      oppChart = new Chart($("#oppChart"), {
+        type: 'bar',
+        data: { labels, datasets: [{ label:"Games played (decade)", data }]},
+        options: { plugins:{legend:{display:false}}, scales:{x:{grid:{color:"#1c2430"}}, y:{grid:{color:"#1c2430"}}} }
+      });
+    }
+
+    // ---------- Kick off ----------
+    if(localStorage.getItem("cfbd_key")) setApiStatus("Key found. Click Reload to fetch data.");
+    bootstrap();
+  </script>
 </body>
 </html>
