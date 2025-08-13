@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Nebraska Football — History Hub (CFBD v2 Fixed)</title>
+  <title>Nebraska Football — History Hub (Perf+Caching)</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
   <style>
     :root{
@@ -19,10 +19,11 @@
     .logo-badge{ width:34px; height:34px; border-radius:8px; display:grid; place-items:center; background:radial-gradient(90px 50px at -10% 120%,#ff2d2d,#d00000 60%,#880000); box-shadow: 0 6px 20px rgba(208,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.09); font-weight:900; }
     .pill{ display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:12px; background:var(--chip); color:var(--muted); font-size:13px; border:1px solid var(--ring); }
     .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    select, input[type="number"], button{ font-family:inherit }
     select, input[type="number"]{ background:var(--panel); border:1px solid var(--ring); color:var(--text); padding:8px 10px; border-radius:10px; }
     .btn{ background:linear-gradient(180deg,#ff6868,#d00000); color:#fff; border:none; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:700; box-shadow:0 8px 26px rgba(208,0,0,.35); }
     .btn.secondary{background:#1e2630; border:1px solid var(--ring); box-shadow:none; color:#d8e1ee}
-    .layout{max-width:1200px; margin:16px auto; display:grid; grid-template-columns: 330px 1fr; gap:16px; padding:0 16px 24px}
+    .layout{max-width:1200px; margin:16px auto; display:grid; grid-template-columns: 340px 1fr; gap:16px; padding:0 16px 24px}
     aside{ background:var(--panel); border:1px solid var(--ring); border-radius:16px; overflow:hidden; }
     .aside-head{padding:12px 14px; display:flex; gap:8px; align-items:center; justify-content:space-between; border-bottom:1px solid var(--ring); background:var(--panel-2)}
     .aside-body{max-height:70vh; overflow:auto}
@@ -46,6 +47,8 @@
     .home{color:#9dd5ff} .away{color:#ffc899} .bowl{color:#ffd36b}
     .progress{height:10px; background:#0e141a; border-radius:999px; overflow:hidden; border:1px solid var(--ring); width:220px}
     .barfill{height:100%; background:linear-gradient(90deg,#ff7b7b,#d00000); width:0%}
+    .era-buttons{display:flex; flex-wrap:wrap; gap:8px; padding:8px}
+    .era-buttons button{ background:#1e2630; border:1px solid var(--ring); color:#d8e1ee; border-radius:10px; padding:6px 10px; cursor:pointer }
     footer{max-width:1200px;margin:18px auto 40px; color:#a9b3c2; font-size:12px; text-align:center}
     .muted{color:#a9b3c2}
     @media (max-width:1000px){.layout{grid-template-columns:1fr}}
@@ -62,18 +65,11 @@
       <div class="pill" id="apiStatus"><span id="apiStatusText">API: not connected</span></div>
 
       <div class="controls">
-        <select id="preloadRange" title="Choose how much history to load">
-          <option value="last10">Load: Last 10 seasons</option>
-          <option value="last25" selected>Load: Last 25 seasons</option>
-          <option value="since1960">Load: Since 1960</option>
-          <option value="all">Load: All seasons</option>
-        </select>
+        <div class="progress" title="Preload progress"><div class="barfill" id="barfill"></div></div>
+        <div class="pill">Loaded: <strong id="loadedCount">0</strong>/<span id="totalToLoad">0</span></div>
         <label class="pill">Concurrency
           <input id="concurrency" type="number" min="1" max="8" value="4" style="width:64px;margin-left:6px">
         </label>
-        <div class="progress"><div class="barfill" id="barfill"></div></div>
-        <div class="pill">Loaded: <strong id="loadedCount">0</strong>/<span id="totalToLoad">0</span></div>
-        <button class="btn" id="preloadBtn">Preload</button>
         <button class="btn secondary" id="clearCacheBtn" title="Clear cached seasons">Clear Cache</button>
         <button class="btn secondary" id="changeKeyBtn" title="Change API Key">API Key</button>
       </div>
@@ -86,11 +82,20 @@
         <div><strong>Seasons</strong> <span class="muted">1890–present</span></div>
         <div class="pill" id="leftMsg">Idle</div>
       </div>
+      <div class="era-buttons">
+        <button data-era="last10">Last 10</button>
+        <button data-era="last25">Last 25</button>
+        <button data-era="bigten">Big Ten Era (2011–Now)</button>
+        <button data-era="big12">Big 12 Era (1996–2010)</button>
+        <button data-era="osborne">Osborne Era (1973–1997)</button>
+        <button data-era="devaney">Devaney Era (1962–1972)</button>
+        <button data-era="all">All</button>
+      </div>
       <div class="aside-body">
         <ul class="season-list" id="seasonList"></ul>
       </div>
       <div class="muted" style="padding:12px;border-top:1px solid var(--ring)">
-        Tip: Click any season to load on demand. Preloading uses a smart queue with retries.
+        Click a season to view instantly from cache (if present). Background refresh updates results silently.
       </div>
     </aside>
 
@@ -130,22 +135,24 @@
   </div>
 
   <footer>
-    Optimized for CFBD v2: camelCase field names, queue + retries, IndexedDB caching.
+    Background refresh (SWR) + IndexedDB caching. Era-based preload buttons included.
   </footer>
 
   <script>
-    // ------------- Utilities -------------
+    // ------------------ Utilities ------------------
     const $ = s => document.querySelector(s);
     const el = (t,c,txt)=>{const e=document.createElement(t); if(c) e.className=c; if(txt) e.textContent=txt; return e;};
     const wait = ms => new Promise(r=>setTimeout(r,ms));
+    const nowIso = ()=> new Date().toISOString();
     function jitter(ms){ return ms + Math.floor(Math.random()*ms*0.25); }
+    function shallowEqual(a,b){ try{return JSON.stringify(a)===JSON.stringify(b);}catch{return false;} }
 
-    // ------------- IndexedDB tiny helper -------------
+    // ------------------ IndexedDB ------------------
     const DB_NAME = "cfbdCache"; const STORE = "seasons";
     function idbOpen(){
       return new Promise((resolve,reject)=>{
-        const req = indexedDB.open(DB_NAME,1);
-        req.onupgradeneeded = (e)=>{ e.target.result.createObjectStore(STORE); };
+        const req = indexedDB.open(DB_NAME,2);
+        req.onupgradeneeded = (e)=>{ const db=e.target.result; if(!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE); };
         req.onerror = ()=> reject(req.error);
         req.onsuccess = ()=> resolve(req.result);
       });
@@ -175,7 +182,7 @@
       });
     }
 
-    // ------------- API -------------
+    // ------------------ API ------------------
     const CFBD = {
       base: "https://api.collegefootballdata.com",
       async get(path, params={}, attempt=0){
@@ -202,11 +209,11 @@
       }
     };
 
-    // ------------- State -------------
+    // ------------------ State ------------------
     const state = {
       startYear: 1890,
       endYear: new Date().getFullYear(),
-      cache: new Map(),    // memory cache year -> games[]
+      mem: new Map(),    // year -> { games, cachedAt }
       selected: null
     };
 
@@ -218,10 +225,10 @@
       if(v){ localStorage.setItem("cfbd_key", v.trim()); setApiStatus("Key saved."); }
     });
     $("#clearCacheBtn").addEventListener("click", async ()=>{
-      await idbClear(); state.cache.clear(); setApiStatus("Cache cleared"); alert("Local cache cleared.");
+      await idbClear(); state.mem.clear(); setApiStatus("Cache cleared"); alert("Local cache cleared.");
     });
 
-    // ------------- Request Queue (for future preloading UI if desired) -------------
+    // ------------------ Queue ------------------
     class Queue{
       constructor(max=4){ this.max=max; this.running=0; this.q=[]; }
       push(fn){ return new Promise((resolve,reject)=>{ this.q.push({fn,resolve,reject}); this.run(); }); }
@@ -234,8 +241,9 @@
       }
     }
     const queue = new Queue(4);
+    $("#concurrency").addEventListener("change", e=>{ queue.max = Math.max(1, Math.min(8, parseInt(e.target.value,10)||4)); });
 
-    // ------------- Seasons UI -------------
+    // ------------------ Seasons UI ------------------
     function buildSeasonList(){
       const ul = $("#seasonList"); ul.innerHTML="";
       for(let y=state.endYear; y>=state.startYear; y--){
@@ -250,34 +258,92 @@
       const first = ul.querySelector("li"); if(first) first.click();
     }
 
-    async function loadSeason(year){
-      if(state.cache.has(year)) return state.cache.get(year);
-      const idbKey = `games-${year}`;
-      const cached = await idbGet(idbKey);
-      if(cached){
-        const parsed = JSON.parse(cached);
-        state.cache.set(year, parsed);
-        return parsed;
-      }
+    // Map eras to ranges
+    function eraRange(era){
+      const end = state.endYear;
+      if(era==="last10") return [end-9, end];
+      if(era==="last25") return [end-24, end];
+      if(era==="bigten") return [2011, end];
+      if(era==="big12") return [1996, 2010];
+      if(era==="osborne") return [1973, 1997];
+      if(era==="devaney") return [1962, 1972];
+      if(era==="all") return [state.startYear, end];
+      return [end-9, end];
+    }
+
+    document.querySelectorAll(".era-buttons button").forEach(b=>{
+      b.addEventListener("click", ()=> {
+        const [start, end] = eraRange(b.dataset.era);
+        startPreload(start, end);
+      });
+    });
+
+    // ------------------ SWR Loaders ------------------
+    async function fetchSeason(year){
       const [reg, post] = await Promise.all([
         CFBD.get("/games", { year, seasonType: "regular", team: "Nebraska" }),
         CFBD.get("/games", { year, seasonType: "postseason", team: "Nebraska" })
       ]);
       const games = [...reg, ...post].sort((a,b)=> new Date(a.startDate) - new Date(b.startDate));
-      state.cache.set(year, games);
-      await idbSet(idbKey, JSON.stringify(games));
-      return games;
+      return { games, cachedAt: nowIso() };
+    }
+
+    async function getSeasonFromCache(year){
+      const raw = await idbGet(`games-${year}`);
+      if(!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+
+    async function setSeasonCache(year, payload){
+      await idbSet(`games-${year}`, JSON.stringify(payload));
+    }
+
+    // Load preferred: return cached immediately if available, then revalidate in background
+    async function loadSeasonSWR(year, {onUpdate}={}){
+      // memory first
+      if(state.mem.has(year)){
+        const cached = state.mem.get(year);
+        setTimeout(()=> revalidate(year, onUpdate), 0);
+        return cached;
+      }
+      // idb then background revalidate
+      const idb = await getSeasonFromCache(year);
+      if(idb){
+        state.mem.set(year, idb);
+        setTimeout(()=> revalidate(year, onUpdate), 0);
+        return idb;
+      }
+      // otherwise fetch fresh
+      const fresh = await fetchSeason(year);
+      state.mem.set(year, fresh);
+      await setSeasonCache(year, fresh);
+      return fresh;
+    }
+
+    async function revalidate(year, onUpdate){
+      try{
+        const fresh = await fetchSeason(year);
+        const current = state.mem.get(year);
+        if(!current || !shallowEqual(current.games, fresh.games)){
+          state.mem.set(year, fresh);
+          await setSeasonCache(year, fresh);
+          if(typeof onUpdate === "function"){ onUpdate(fresh); }
+          if(state.selected === year){ renderSeason(year, fresh.games); }
+        }
+      }catch(e){ /* silent revalidate errors */ }
     }
 
     async function selectSeason(year, li, rightEl){
       const ul = $("#seasonList"); [...ul.children].forEach(n=>n.classList.remove("active")); li.classList.add("active");
       $("#seasonTitle").textContent = `Season ${year}`; $("#seasonMeta").textContent = "…";
-      setLeft("Loading season…"); setApiStatus("Loading…");
+      setLeft("Loading (cache first)…"); setApiStatus("Loading…");
       try{
-        const games = await loadSeason(year);
-        renderSeason(year, games);
+        const payload = await loadSeasonSWR(year, { onUpdate: (fresh)=> {
+          if(state.selected === year){ renderSeason(year, fresh.games); }
+        }});
+        renderSeason(year, payload.games);
         rightEl.textContent = `${$("#w").textContent}-${$("#l").textContent}${($("#t").textContent!=="0")?'-'+$("#t").textContent:''}`;
-        setLeft("Ready"); setApiStatus("Ready");
+        setLeft("Ready"); setApiStatus(`Cached: ${new Date(payload.cachedAt).toLocaleString()}`);
         state.selected = year;
       }catch(err){
         console.error(err);
@@ -290,7 +356,6 @@
       const body = $("#gamesBody"); body.innerHTML="";
       let w=0,l=0,t=0; const confSet = new Set();
       for(const g of games){
-        // CFBD v2 camelCase fields
         const isHome = g.homeTeam === "Nebraska";
         const opp = isHome ? g.awayTeam : g.homeTeam;
         const oppConf = isHome ? g.awayConference : g.homeConference;
@@ -321,6 +386,39 @@
       $("#seasonMeta").textContent = `${games.length} game${games.length===1?"":"s"}`;
     }
 
+    // ------------------ Era Preload ------------------
+    async function startPreload(start, end){
+      const years = []; for(let y=end; y>=start; y--) years.push(y);
+      $("#totalToLoad").textContent = years.length.toString();
+      let done=0; $("#loadedCount").textContent = "0"; $("#barfill").style.width = "0%";
+      setApiStatus("Preloading…"); setLeft(`Queueing ${years.length} seasons…`);
+
+      await Promise.all(years.map(year => queue.push(async ()=>{
+        try{
+          // SWR: get cached or fetch, then revalidate; but for preload we just ensure cache is warm
+          const cached = await getSeasonFromCache(year);
+          if(!cached){
+            const payload = await fetchSeason(year);
+            state.mem.set(year, payload);
+            await setSeasonCache(year, payload);
+          }
+        }catch(e){
+          // ignore individual failures; retries already applied in fetchSeason via CFBD.get
+        }finally{
+          done++; $("#loadedCount").textContent = String(done);
+          $("#barfill").style.width = Math.round(done/years.length*100) + "%";
+        }
+      })));
+
+      setApiStatus("Preload complete");
+      setLeft("Ready");
+      // if nothing selected, select most recent within the range
+      if(state.selected==null){
+        const ul = $("#seasonList"); const first = ul.querySelector("li"); if(first) first.click();
+      }
+    }
+
+    // ------------------ Init ------------------
     (function init(){
       if(localStorage.getItem("cfbd_key")) setApiStatus("Key found");
       else {
